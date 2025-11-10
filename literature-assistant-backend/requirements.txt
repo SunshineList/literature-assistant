@@ -1,0 +1,16 @@
+fastapi
+uvicorn
+sqlalchemy
+aiosqlite
+pydantic
+pydantic-settings
+python-multipart
+aiofiles
+PyPDF2
+python-docx
+markdown
+python-dateutil
+sse-starlette
+openai
+ollama
+
