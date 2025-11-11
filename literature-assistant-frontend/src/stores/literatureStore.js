@@ -31,7 +31,8 @@ export const useLiteratureStore = defineStore('literature', {
       { label: 'Word文档', value: 'doc' },
       { label: 'Word文档', value: 'docx' },
       { label: 'Markdown', value: 'md' },
-      { label: 'Markdown', value: 'markdown' }
+      { label: 'Markdown', value: 'markdown' },
+      {label: 'Txt', value: 'txt'}
     ]
   }),
   
