@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     
     # 数据库配置
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/literature_assistant.db"
+    POSTGRES_DB: str = ""
+    POSTGRES_USER: str = ""
+    POSTGRES_PASSWORD: str = ""
     
     # 文件上传配置
     UPLOAD_DIR: str = "./uploads/documents"
