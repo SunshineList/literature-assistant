@@ -57,7 +57,7 @@ services:
     container_name: literature-frontend
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "1234:1234"
     depends_on:
       - backend
     networks:
