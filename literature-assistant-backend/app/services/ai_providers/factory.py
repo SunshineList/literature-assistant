@@ -3,18 +3,16 @@ AI 提供商工厂
 """
 from typing import Dict, Type
 from app.services.ai_providers.base import AIProvider
-from app.services.ai_providers.kimi_provider import KimiProvider
-from app.services.ai_providers.ollama_provider import OllamaProvider
+from app.services.ai_providers.openai_compatible_provider import OpenAICompatibleProvider
 from app.core.exceptions import AIException
 
 
 class AIProviderFactory:
     """AI 提供商工厂类"""
     
-    # 注册的提供商
+    # 注册的提供商（统一使用OpenAI兼容接口）
     _providers: Dict[str, Type[AIProvider]] = {
-        "kimi": KimiProvider,
-        "ollama": OllamaProvider,
+        "openai_compatible": OpenAICompatibleProvider,
     }
     
     @classmethod

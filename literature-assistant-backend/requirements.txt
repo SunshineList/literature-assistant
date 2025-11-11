@@ -2,6 +2,9 @@ fastapi
 uvicorn
 sqlalchemy
 aiosqlite
+asyncpg
+psycopg2-binary
+greenlet
 pydantic
 pydantic-settings
 python-multipart
@@ -13,4 +16,5 @@ python-dateutil
 sse-starlette
 openai
 ollama
+pyjwt
 

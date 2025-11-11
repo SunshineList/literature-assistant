@@ -8,6 +8,9 @@ import router from './router/index.js'
 import App from './App.vue'
 import './style.css'
 
+// 导入统一的请求配置（会自动设置拦截器）
+import './utils/request'
+
 const app = createApp(App)
 const pinia = createPinia()
 

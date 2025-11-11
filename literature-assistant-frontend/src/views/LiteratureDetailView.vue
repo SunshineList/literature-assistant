@@ -293,17 +293,29 @@ const downloadFile = async () => {
     
     // 创建下载链接
     const downloadUrl = `/api/literature/${currentLiterature.value.id}/download`
+    const token = localStorage.getItem('token')
     
-    // 使用fetch检查文件是否存在
-    const response = await fetch(downloadUrl, { method: 'HEAD' })
+    // 使用fetch下载文件（带token）
+    const response = await fetch(downloadUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
     
+    // 获取文件blob
+    const blob = await response.blob()
+    
+    // 创建blob URL
+    const blobUrl = window.URL.createObjectURL(blob)
+    
     // 创建临时链接进行下载
     const link = document.createElement('a')
-    link.href = downloadUrl
+    link.href = blobUrl
     link.download = currentLiterature.value.originalName || '文献文件'
     link.style.display = 'none'
     
@@ -313,9 +325,10 @@ const downloadFile = async () => {
     
     // 清理
     document.body.removeChild(link)
+    window.URL.revokeObjectURL(blobUrl)
     
-    // 提示下载开始
-    ElMessage.success('文件下载已开始')
+    // 提示下载成功
+    ElMessage.success('文件下载成功')
     
   } catch (error) {
     console.error('下载文件失败:', error)

@@ -1,7 +1,7 @@
 """
 文献数据模型
 """
-from sqlalchemy import Column, BigInteger, String, Integer, Text, DateTime, SmallInteger
+from sqlalchemy import Column, BigInteger, String, Integer, Text, DateTime, SmallInteger, ForeignKey
 from sqlalchemy.sql import func
 from app.core.database import Base
 
@@ -11,6 +11,7 @@ class Literature(Base):
     __tablename__ = "literature"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True, comment="主键ID")
+    user_id = Column(BigInteger, ForeignKey("users.id"), nullable=False, comment="用户ID")
     original_name = Column(String(255), nullable=False, comment="原始文件名")
     file_path = Column(String(500), nullable=False, comment="文件存储路径")
     file_size = Column(BigInteger, nullable=False, comment="文件大小(字节)")

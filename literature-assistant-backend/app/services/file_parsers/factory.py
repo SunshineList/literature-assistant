@@ -6,6 +6,7 @@ from app.services.file_parsers.base import FileParser
 from app.services.file_parsers.pdf_parser import PDFParser
 from app.services.file_parsers.word_parser import WordParser
 from app.services.file_parsers.markdown_parser import MarkdownParser
+from app.services.file_parsers.txt_parser import TxtParser
 from app.core.exceptions import FileException
 
 
@@ -25,6 +26,7 @@ class FileParserFactory:
             cls.register_parser(PDFParser)
             cls.register_parser(WordParser)
             cls.register_parser(MarkdownParser)
+            cls.register_parser(TxtParser)
     
     @classmethod
     def register_parser(cls, parser_class: Type[FileParser]):

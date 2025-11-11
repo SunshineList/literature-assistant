@@ -21,6 +21,7 @@ class LiteratureService:
     async def create_literature(
         self,
         db: AsyncSession,
+        user_id: int,
         original_name: str,
         file_path: str,
         file_size: int,
@@ -36,6 +37,7 @@ class LiteratureService:
         
         Args:
             db: 数据库会话
+            user_id: 用户ID
             original_name: 原始文件名
             file_path: 文件路径
             file_size: 文件大小
@@ -54,6 +56,7 @@ class LiteratureService:
             tags_json = json.dumps(tags, ensure_ascii=False) if tags else None
             
             literature = Literature(
+                user_id=user_id,
                 original_name=original_name,
                 file_path=file_path,
                 file_size=file_size,
@@ -117,7 +120,8 @@ class LiteratureService:
     async def get_literature_by_id(
         self,
         db: AsyncSession,
-        literature_id: int
+        literature_id: int,
+        user_id: Optional[int] = None
     ) -> Optional[Literature]:
         """
         根据ID获取文献
@@ -125,18 +129,22 @@ class LiteratureService:
         Args:
             db: 数据库会话
             literature_id: 文献ID
+            user_id: 用户ID（如果提供，则只返回该用户的文献）
             
         Returns:
             文献对象或None
         """
         try:
+            conditions = [
+                Literature.id == literature_id,
+                Literature.deleted == 0
+            ]
+            
+            if user_id is not None:
+                conditions.append(Literature.user_id == user_id)
+            
             result = await db.execute(
-                select(Literature).where(
-                    and_(
-                        Literature.id == literature_id,
-                        Literature.deleted == 0
-                    )
-                )
+                select(Literature).where(and_(*conditions))
             )
             return result.scalar_one_or_none()
         except Exception as e:
@@ -145,7 +153,8 @@ class LiteratureService:
     async def page_query(
         self,
         db: AsyncSession,
-        query_params: LiteratureQueryRequest
+        query_params: LiteratureQueryRequest,
+        user_id: Optional[int] = None
     ) -> tuple[List[Literature], int]:
         """
         分页查询文献列表 - 使用建造者模式
@@ -153,6 +162,7 @@ class LiteratureService:
         Args:
             db: 数据库会话
             query_params: 查询参数
+            user_id: 用户ID（如果提供，则只返回该用户的文献）
             
         Returns:
             (文献列表, 总数)
@@ -160,6 +170,10 @@ class LiteratureService:
         try:
             # 使用建造者模式构建查询
             query_builder = LiteratureQueryBuilder.from_request(query_params)
+            
+            # 如果提供了user_id，添加用户过滤条件
+            if user_id is not None:
+                query_builder.with_user(user_id)
             
             # 查询总数
             count_query = query_builder.build_count_query()
@@ -183,6 +197,59 @@ class LiteratureService:
     def to_detail_response(self, literature: Literature) -> LiteratureDetailResponse:
         """转换为详情响应模型"""
         return LiteratureDetailResponse.from_orm_model(literature)
+    
+    async def delete_literature(
+        self,
+        db: AsyncSession,
+        literature_id: int,
+        user_id: int
+    ) -> bool:
+        """
+        删除文献（真删除：删除数据库记录和本地文件）
+        
+        Args:
+            db: 数据库会话
+            literature_id: 文献ID
+            user_id: 用户ID
+            
+        Returns:
+            是否删除成功
+        """
+        try:
+            literature = await self.get_literature_by_id(db, literature_id, user_id)
+            
+            if not literature:
+                raise NotFoundException("文献不存在或无权限删除")
+            
+            # 获取文件路径
+            file_path = literature.file_path
+            
+            # 从数据库中删除记录
+            await db.delete(literature)
+            await db.flush()
+            
+            # 删除本地文件
+            if file_path:
+                import os
+                from app.config import settings
+                
+                # 构建完整的文件路径
+                full_path = os.path.join(settings.UPLOAD_DIR, file_path)
+                
+                # 如果文件存在，删除它
+                if os.path.exists(full_path):
+                    try:
+                        os.remove(full_path)
+                        print(f"已删除文件: {full_path}")
+                    except Exception as e:
+                        print(f"删除文件失败: {full_path}, 错误: {str(e)}")
+                        # 文件删除失败不影响数据库删除
+            
+            return True
+        except NotFoundException:
+            raise
+        except Exception as e:
+            raise DatabaseException(f"删除文献失败: {str(e)}")
 
 
 # 创建全局实例

@@ -34,35 +34,72 @@
               <div class="upload-text">
                 <p>将文件拖拽到此处，或<em>点击上传</em></p>
                 <p class="upload-tip">
-                  支持 PDF、Word、Markdown 格式，单个文件不超过 50MB
+                  支持 PDF、Word、Markdown、TXT 格式，单个文件不超过 50MB
                 </p>
               </div>
             </div>
           </el-upload>
         </el-form-item>
         
-        <el-form-item label="Kimi API Key" prop="apiKey" required>
-          <el-input
-            v-model="formData.apiKey"
-            type="password"
-            placeholder="请输入您的 Kimi API Key"
-            show-password
-            clearable
-          />
-          <div class="api-key-tip">
-            <el-text size="small" type="info">
-              API Key 用于生成智能阅读指南，会自动保存到浏览器本地
-            </el-text>
-            <el-button 
-              v-if="formData.apiKey" 
-              link 
-              type="danger" 
-              size="small" 
-              @click="clearSavedApiKey"
-              style="margin-left: 8px;"
+        <el-form-item label="专家选择" prop="expertId" required>
+          <div class="expert-cards">
+            <div
+              v-for="expert in availableExperts"
+              :key="expert.id"
+              class="expert-card"
+              :class="{ selected: formData.expertId === expert.id }"
+              @click="formData.expertId = expert.id"
             >
-              清除保存的密钥
-            </el-button>
+              <div class="expert-icon">{{ expert.icon }}</div>
+              <div class="expert-info">
+                <div class="expert-name">{{ expert.name }}</div>
+                <div class="expert-category">{{ expert.category }}</div>
+                <div class="expert-description">{{ expert.description }}</div>
+              </div>
+              <el-icon v-if="formData.expertId === expert.id" class="selected-icon"><CircleCheck /></el-icon>
+            </div>
+          </div>
+          <div style="margin-top: 12px;">
+            <el-text size="small" type="info">
+              不同专家会使用不同的分析视角生成阅读指南
+            </el-text>
+          </div>
+        </el-form-item>
+        
+        <el-form-item label="AI 模型" prop="aiModelId">
+          <div class="model-cards">
+            <div
+              v-for="model in availableModels"
+              :key="model.id"
+              class="model-card"
+              :class="{ selected: formData.aiModelId === model.id }"
+              @click="formData.aiModelId = model.id"
+            >
+              <div class="model-info">
+                <div class="model-name">
+                  {{ model.name }}
+                  <el-tag v-if="model.isDefault === 1" type="success" size="small" style="margin-left: 8px;">默认</el-tag>
+                </div>
+                <div class="model-details">{{ model.modelName }}</div>
+              </div>
+              <el-icon v-if="formData.aiModelId === model.id" class="selected-icon"><CircleCheck /></el-icon>
+            </div>
+            <div
+              class="model-card"
+              :class="{ selected: formData.aiModelId === null }"
+              @click="formData.aiModelId = null"
+            >
+              <div class="model-info">
+                <div class="model-name">使用默认模型</div>
+                <div class="model-details">系统将自动选择默认AI模型</div>
+              </div>
+              <el-icon v-if="formData.aiModelId === null" class="selected-icon"><CircleCheck /></el-icon>
+            </div>
+          </div>
+          <div style="margin-top: 12px;">
+            <el-text size="small" type="info">
+              如需添加模型，请前往"AI模型管理"页面
+            </el-text>
           </div>
         </el-form-item>
       </el-form>
@@ -147,6 +184,8 @@ import { UploadFilled, Loading, CircleCheck } from '@element-plus/icons-vue'
 import { marked } from 'marked'
 import mermaid from 'mermaid'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { useAIModelStore } from '@/stores/aiModelStore'
+import request from '@/utils/request'
 
 // Props 和 Emits
 const props = defineProps({
@@ -158,6 +197,9 @@ const props = defineProps({
 
 const emit = defineEmits(['update:modelValue', 'success'])
 
+// Store
+const aiModelStore = useAIModelStore()
+
 // 响应式数据
 const dialogVisible = ref(false)
 const formRef = ref()
@@ -167,48 +209,13 @@ const contentRef = ref()
 // 表单数据
 const formData = ref({
   file: null,
-  apiKey: ''
+  expertId: 'academic-mentor',  // 专家ID，默认为学术导师
+  aiModelId: null  // AI模型ID，null表示使用默认模型
 })
 
 const fileList = ref([])
-
-// API Key 存储相关
-const API_KEY_STORAGE_KEY = 'literature_assistant_api_key'
-
-// 从 localStorage 读取保存的 API Key
-const loadSavedApiKey = () => {
-  try {
-    const savedKey = localStorage.getItem(API_KEY_STORAGE_KEY)
-    if (savedKey) {
-      formData.value.apiKey = savedKey
-    }
-  } catch (error) {
-    console.warn('读取保存的 API Key 失败:', error)
-  }
-}
-
-// 保存 API Key 到 localStorage
-const saveApiKey = (apiKey) => {
-  try {
-    if (apiKey && apiKey.trim()) {
-      localStorage.setItem(API_KEY_STORAGE_KEY, apiKey.trim())
-    }
-  } catch (error) {
-    console.warn('保存 API Key 失败:', error)
-  }
-}
-
-// 清除保存的 API Key
-const clearSavedApiKey = () => {
-  try {
-    localStorage.removeItem(API_KEY_STORAGE_KEY)
-    formData.value.apiKey = ''
-    ElMessage.success('已清除保存的 API Key')
-  } catch (error) {
-    console.warn('清除保存的 API Key 失败:', error)
-    ElMessage.error('清除失败，请重试')
-  }
-}
+const availableModels = ref([])
+const availableExperts = ref([])
 
 // 生成状态
 const isGenerating = ref(false)
@@ -236,19 +243,18 @@ const dialogVisibleComputed = computed({
 })
 
 const canSubmit = computed(() => {
-  return formData.value.file && formData.value.apiKey.trim()
+  return !!formData.value.file
 })
 
-const acceptedFileTypes = '.pdf,.doc,.docx,.md,.markdown'
+const acceptedFileTypes = '.pdf,.doc,.docx,.md,.markdown,.txt'
 
 // 表单验证规则
 const formRules = {
   file: [
     { required: true, message: '请选择要上传的文件', trigger: 'change' }
   ],
-  apiKey: [
-    { required: true, message: '请输入 Kimi API Key', trigger: 'blur' },
-    { min: 10, message: 'API Key 长度不能少于 10 个字符', trigger: 'blur' }
+  expertId: [
+    { required: true, message: '请选择专家类型', trigger: 'change' }
   ]
 }
 
@@ -633,9 +639,10 @@ const renderMermaidCharts = async () => {
 }
 
 // 组件挂载时初始化 Mermaid
-onMounted(() => {
-  // 加载保存的 API Key
-  loadSavedApiKey()
+onMounted(async () => {
+  // 加载AI模型列表
+  await loadAIModels()
+  await loadExperts()
   
   try {
     mermaid.initialize({
@@ -705,9 +712,9 @@ const handleFileRemove = () => {
 
 // 文件上传前检查
 const beforeUpload = (file) => {
-  const isValidType = /\.(pdf|doc|docx|md|markdown)$/i.test(file.name)
+  const isValidType = /\.(pdf|doc|docx|md|markdown|txt)$/i.test(file.name)
   if (!isValidType) {
-    ElMessage.error('只支持 PDF、Word、Markdown 格式的文件！')
+    ElMessage.error('只支持 PDF、Word、Markdown、TXT 格式的文件！')
     return false
   }
   
@@ -724,14 +731,33 @@ const beforeUpload = (file) => {
 const handleSubmit = async () => {
   try {
     await formRef.value.validate()
-    
-    // 保存 API Key 到 localStorage
-    saveApiKey(formData.value.apiKey)
-    
     await startSSEGeneration()
   } catch (error) {
-
     ElMessage.error('请检查表单信息')
+  }
+}
+
+// 加载AI模型列表
+const loadAIModels = async () => {
+  try {
+    await aiModelStore.fetchModels()
+    availableModels.value = aiModelStore.models.filter(m => m.status === 1) // 只显示启用的模型
+  } catch (error) {
+    console.error('加载AI模型失败:', error)
+    ElMessage.warning('加载AI模型列表失败，将使用默认模型')
+  }
+}
+
+// 加载专家列表
+const loadExperts = async () => {
+  try {
+    const response = await request.get('/literature/experts/list')
+    if (response.data.code === 200) {
+      availableExperts.value = response.data.data
+    }
+  } catch (error) {
+    console.error('加载专家列表失败:', error)
+    ElMessage.warning('加载专家列表失败')
   }
 }
 
@@ -744,7 +770,12 @@ const startSSEGeneration = async () => {
     // 创建 FormData
     const formDataToSend = new FormData()
     formDataToSend.append('file', formData.value.file)
-    formDataToSend.append('apiKey', formData.value.apiKey)
+    formDataToSend.append('expertId', formData.value.expertId)
+    
+    // 如果用户选择了特定模型，添加模型ID参数
+    if (formData.value.aiModelId) {
+      formDataToSend.append('aiModelId', formData.value.aiModelId)
+    }
     
     // 开始连接
     await connectSSE(formDataToSend)
@@ -762,15 +793,24 @@ const connectSSE = async (formDataToSend) => {
     sseState.value.isConnected = false
     sseState.value.isReconnecting = false
     
+    // 获取token
+    const token = localStorage.getItem('token')
+    const headers = {
+      'Accept': 'text/event-stream',
+      'Cache-Control': 'no-cache'
+    }
+    
+    // 添加认证token
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+    
     fetchEventSource('/api/literature/generate-guide', {
       method: 'POST',
       body: formDataToSend,
       signal: abortController.signal,
       openWhenHidden: true,
-      headers: {
-        'Accept': 'text/event-stream',
-        'Cache-Control': 'no-cache'
-      },
+      headers,
       
       async onopen(response) {
         if (response.ok && response.headers.get('content-type')?.includes('text/event-stream')) {
@@ -1078,11 +1118,10 @@ const resetForm = () => {
   renderedContent.value = ''
   progressMessage.value = ''
   
-  // 重置表单数据（保留API Key）
-  const savedApiKey = formData.value.apiKey
+  // 重置表单数据
   formData.value = {
     file: null,
-    apiKey: savedApiKey // 保留API Key，方便重新尝试
+    aiModelId: null
   }
   fileList.value = []
   
@@ -1107,6 +1146,129 @@ const handleClose = () => {
 <style scoped>
 .upload-form {
   padding: 20px 0;
+}
+
+/* 专家卡片样式 */
+.expert-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.expert-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+}
+
+.expert-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.expert-card.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.expert-icon {
+  font-size: 32px;
+  flex-shrink: 0;
+}
+
+.expert-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.expert-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+  margin-bottom: 4px;
+}
+
+.expert-category {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #f3f4f6;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.expert-description {
+  font-size: 12px;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.selected-icon {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 20px;
+  color: #3b82f6;
+}
+
+/* AI模型卡片样式 */
+.model-cards {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.model-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: white;
+}
+
+.model-card:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
+}
+
+.model-card.selected {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.2);
+}
+
+.model-info {
+  flex: 1;
+}
+
+.model-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: #1f2937;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.model-details {
+  font-size: 12px;
+  color: #6b7280;
 }
 
 .upload-area {

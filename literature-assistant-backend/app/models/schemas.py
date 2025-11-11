@@ -74,3 +74,93 @@ class HealthResponse(BaseModel):
     status: str = "ok"
     message: str = "服务正常运行"
 
+
+# ==================== 用户相关 ====================
+
+class UserRegisterRequest(BaseModel):
+    """用户注册请求"""
+    username: str = Field(..., min_length=3, max_length=50, description="用户名")
+    email: str = Field(..., description="邮箱")
+    password: str = Field(..., min_length=6, description="密码")
+
+
+class UserLoginRequest(BaseModel):
+    """用户登录请求"""
+    username: str = Field(..., description="用户名")
+    password: str = Field(..., description="密码")
+
+
+class UserResponse(BaseModel):
+    """用户响应模型"""
+    id: int
+    username: str
+    email: str
+    role: str
+    status: int
+    createTime: datetime
+    updateTime: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class UserLoginResponse(BaseModel):
+    """用户登录响应"""
+    token: str
+    user: UserResponse
+
+
+class UserUpdateRequest(BaseModel):
+    """用户更新请求"""
+    email: Optional[str] = None
+    password: Optional[str] = None
+
+
+# ==================== AI模型配置相关 ====================
+
+class AIModelCreateRequest(BaseModel):
+    """AI模型创建请求"""
+    name: str = Field(..., min_length=1, max_length=255, description="模型名称")
+    provider: str = Field(default="openai_compatible", description="提供商类型")
+    baseUrl: str = Field(..., description="API基础URL")
+    apiKey: Optional[str] = Field(None, description="API密钥")
+    modelName: str = Field(..., description="实际模型名称")
+    maxTokens: int = Field(default=4096, ge=1, description="最大token数")
+    temperature: str = Field(default="0.7", description="温度参数")
+    isDefault: bool = Field(default=False, description="是否为默认模型")
+    description: Optional[str] = Field(None, description="模型描述")
+
+
+class AIModelUpdateRequest(BaseModel):
+    """AI模型更新请求"""
+    name: Optional[str] = Field(None, min_length=1, max_length=255, description="模型名称")
+    baseUrl: Optional[str] = Field(None, description="API基础URL")
+    apiKey: Optional[str] = Field(None, description="API密钥")
+    modelName: Optional[str] = Field(None, description="实际模型名称")
+    maxTokens: Optional[int] = Field(None, ge=1, description="最大token数")
+    temperature: Optional[str] = Field(None, description="温度参数")
+    isDefault: Optional[bool] = Field(None, description="是否为默认模型")
+    status: Optional[int] = Field(None, description="状态")
+    description: Optional[str] = Field(None, description="模型描述")
+
+
+class AIModelResponse(BaseModel):
+    """AI模型响应"""
+    id: int
+    userId: int
+    name: str
+    provider: str
+    baseUrl: str
+    apiKey: Optional[str] = None
+    modelName: str
+    maxTokens: int
+    temperature: str
+    isDefault: int
+    status: int
+    description: Optional[str] = None
+    createTime: datetime
+    updateTime: datetime
+
+    class Config:
+        from_attributes = True
+

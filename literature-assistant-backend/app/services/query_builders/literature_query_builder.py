@@ -96,6 +96,20 @@ class LiteratureQueryBuilder:
         
         return self
     
+    def with_user(self, user_id: int) -> "LiteratureQueryBuilder":
+        """
+        添加用户过滤条件
+        
+        Args:
+            user_id: 用户ID
+            
+        Returns:
+            self (支持链式调用)
+        """
+        if user_id:
+            self._conditions.append(Literature.user_id == user_id)
+        return self
+    
     def with_pagination(self, page_num: int, page_size: int) -> "LiteratureQueryBuilder":
         """
         添加分页条件

@@ -171,7 +171,7 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
             <el-button
               type="primary"
@@ -190,6 +190,15 @@
               @click.stop="viewDetail(row.id)"
             >
               查看详情
+            </el-button>
+            <el-button
+              type="danger"
+              link
+              size="small"
+              @click.stop="handleDelete(row)"
+            >
+              <el-icon><Delete /></el-icon>
+              删除
             </el-button>
           </template>
         </el-table-column>
@@ -227,10 +236,10 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLiteratureStore } from '@/stores/literatureStore'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import ImportLiteratureModal from '@/components/ImportLiteratureModal.vue'
 import BatchImportModal from '@/components/BatchImportModal.vue'
-import { Plus, Search, Refresh, Download, Upload } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Download, Upload, Delete } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const literatureStore = useLiteratureStore()
@@ -331,6 +340,28 @@ const handleBatchImportSuccess = () => {
   literatureStore.fetchLiteratures()
 }
 
+// 删除文献
+const handleDelete = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除文献 "${row.originalName}" 吗？此操作不可恢复。`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    await literatureStore.deleteLiterature(row.id)
+    ElMessage.success('删除成功')
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '删除失败')
+    }
+  }
+}
+
 // 下载文件
 const downloadFile = async (literature) => {
   if (!literature || downloadingIds.value.has(literature.id)) {
@@ -343,17 +374,29 @@ const downloadFile = async (literature) => {
     
     // 创建下载链接
     const downloadUrl = `/api/literature/${literature.id}/download`
+    const token = localStorage.getItem('token')
     
-    // 使用fetch检查文件是否存在
-    const response = await fetch(downloadUrl, { method: 'HEAD' })
+    // 使用fetch下载文件（带token）
+    const response = await fetch(downloadUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
     
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
     
+    // 获取文件blob
+    const blob = await response.blob()
+    
+    // 创建blob URL
+    const blobUrl = window.URL.createObjectURL(blob)
+    
     // 创建临时链接进行下载
     const link = document.createElement('a')
-    link.href = downloadUrl
+    link.href = blobUrl
     link.download = literature.originalName || '文献文件'
     link.style.display = 'none'
     
@@ -363,9 +406,10 @@ const downloadFile = async (literature) => {
     
     // 清理
     document.body.removeChild(link)
+    window.URL.revokeObjectURL(blobUrl)
     
-    // 提示下载开始
-    ElMessage.success(`${literature.originalName} 下载已开始`)
+    // 提示下载成功
+    ElMessage.success(`${literature.originalName} 下载成功`)
     
   } catch (error) {
     console.error('下载文件失败:', error)
@@ -399,12 +443,20 @@ const formatFileSize = (bytes) => {
 // 格式化日期时间
 const formatDateTime = (dateTime) => {
   if (!dateTime) return '-'
-  return new Date(dateTime).toLocaleString('zh-CN', {
+  
+  // 将时间字符串转换为Date对象
+  const date = new Date(dateTime)
+  
+  // 添加8小时（转换为北京时间）
+  const beijingTime = new Date(date.getTime() + 8 * 60 * 60 * 1000)
+  
+  return beijingTime.toLocaleString('zh-CN', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    // timeZone: 'UTC'  // 指定为UTC，因为我们已经手动加了8小时
   })
 }
 

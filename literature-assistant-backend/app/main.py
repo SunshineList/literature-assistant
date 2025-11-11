@@ -9,7 +9,8 @@ from app.config import settings
 from app.core.database import init_db
 from app.core.exceptions import LiteratureException
 from app.core.response import Response
-from app.api import literature
+from app.api import literature, user, ai_model
+from app.core.response_builder import ResponseBuilder
 
 
 @asynccontextmanager
@@ -50,24 +51,20 @@ app.add_middleware(
 @app.exception_handler(LiteratureException)
 async def literature_exception_handler(request: Request, exc: LiteratureException):
     """自定义异常处理"""
-    return JSONResponse(
-        status_code=200,
-        content=Response.error(message=exc.message, code=exc.code).model_dump()
-    )
+    return ResponseBuilder.error(message=exc.message, code=exc.code)
 
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """全局异常处理"""
     print(f"未处理的异常: {str(exc)}")
-    return JSONResponse(
-        status_code=200,
-        content=Response.error(message=f"服务器内部错误: {str(exc)}", code=500).model_dump()
-    )
+    return Response.error(message=f"服务器内部错误: {str(exc)}", code=500)
 
 
 # 注册路由
 app.include_router(literature.router, prefix=settings.API_PREFIX)
+app.include_router(user.router, prefix=settings.API_PREFIX)
+app.include_router(ai_model.router, prefix=settings.API_PREFIX)
 
 
 @app.get("/")

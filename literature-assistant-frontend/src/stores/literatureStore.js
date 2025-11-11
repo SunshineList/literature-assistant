@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import axios from 'axios'
+import request from '@/utils/request'
 
 export const useLiteratureStore = defineStore('literature', {
   state: () => ({
@@ -56,7 +56,7 @@ export const useLiteratureStore = defineStore('literature', {
       this.error = null
       
       try {
-        const response = await axios.post('/api/literature/page', {
+        const response = await request.post('/literature/page', {
           pageNum: this.queryParams.page,
           pageSize: this.queryParams.size,
           keyword: this.queryParams.keyword || undefined,
@@ -96,7 +96,7 @@ export const useLiteratureStore = defineStore('literature', {
       this.currentLiterature = null
       
       try {
-        const response = await axios.get(`/api/literature/${id}`)
+        const response = await request.get(`/literature/${id}`)
         
         if (response.data.success) {
           this.currentLiterature = response.data.data
@@ -164,6 +164,30 @@ export const useLiteratureStore = defineStore('literature', {
     clearCurrentLiterature() {
       this.currentLiterature = null
       this.detailLoading = false
+    },
+    
+    // 删除文献
+    async deleteLiterature(id) {
+      this.loading = true
+      this.error = null
+      
+      try {
+        const response = await request.delete(`/literature/${id}`)
+        
+        if (response.data.success) {
+          // 刷新列表
+          await this.fetchLiteratures()
+          return true
+        } else {
+          throw new Error(response.data.message || '删除文献失败')
+        }
+      } catch (error) {
+        this.error = error.response?.data?.message || error.message || '删除文献失败'
+        console.error('删除文献失败:', error)
+        throw error
+      } finally {
+        this.loading = false
+      }
     }
   }
 })
